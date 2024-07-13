@@ -305,3 +305,52 @@ def plot_suitability(view_window, growing_season_suitability, daily_suitability,
     # Show the plot
     plt.show()
 
+def merge_overlapping_monthday_ranges(date_ranges):
+    """Converts date ranges to month-day format and merges overlapping ranges.
+
+    Args:
+        date_ranges (list): List of date ranges, each as [start_date, end_date].
+
+    Returns:
+        list: List of merged month-day ranges, each as (start_month, start_day, end_month, end_day).
+    """
+
+    # month_day_ranges = [(date.month, date.day) for start, end in date_ranges for date in [start, end]]
+    # month_day_ranges.sort()  
+
+    month_day_ranges = [(start.month, start.day, end.month, end.day) for [start, end] in date_ranges]
+
+    merged_ranges = []
+    current_range = month_day_ranges[0]
+    
+    for start_month2, start_day2, end_month2, end_day2 in month_day_ranges[1:]:
+        start_month1, start_day1, end_month1, end_day1 = current_range
+        if end_month1 < start_month1:
+            end_month1 += 12
+        if end_month2 < start_month2:
+            end_month2 += 12
+        # Range 1 starts before Range 2 ends, and Range 1 ends after Range 2 starts:
+        if ((start_month1 < end_month2 or (start_month1 == end_month2 and start_day1 <= end_day2)) and
+            (end_month1 > start_month2 or (end_month1 == start_month2 and end_day1 >= start_day2))):
+            # Overlapping range - extend the end
+            current_range = (start_month1, start_day1, end_month2, end_day2)
+        # Range 1 is fully contained within Range 2:
+        elif ((start_month1 >= start_month2 and start_day1 >= start_day2) and
+            (end_month1 <= end_month2 and end_day1 <= end_day2)):
+            current_range = (start_month2, start_day2, end_month2, end_day2)
+        # Range 2 is fully contained within Range 1:
+        elif ((start_month2 >= start_month1 and start_day2 >= start_day1) and
+            (end_month2 <= end_month1 and end_day2 <= end_day1)):
+            current_range = (start_month1, start_day1, end_month1, end_day1)
+        else:
+            # New range - add the current range and start a new one
+            merged_ranges.append(current_range)
+            if end_month1 > 12:
+                end_month1 -= 12
+            if end_month2 > 12:
+                end_month2 -= 12
+            current_range = (start_month2, start_day2, end_month2, end_day2)
+
+    merged_ranges.append(current_range)  # Add the last range
+
+    return merged_ranges
