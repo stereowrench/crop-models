@@ -304,3 +304,4 @@ def plot_suitability(view_window, growing_season_suitability, daily_suitability,
     
     # Show the plot
     plt.show()
+
