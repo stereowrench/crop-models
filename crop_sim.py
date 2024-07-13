@@ -6,6 +6,11 @@ import xarray as xr
 import datetime
 from math import floor, ceil
 from scipy.signal import savgol_filter
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
+from scipy.constants import convert_temperature
 
 def load_ecocrop():
     # Replace 'your_ecocrop_file.csv' with your actual file path
@@ -229,12 +234,6 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     return optimal_planting_ranges
 
 def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, view_window, optimal_planting_ranges, lat, lon, crop_name):
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
-    import matplotlib.lines as mlines
-    import matplotlib.patches as mpatches
-    from scipy.constants import convert_temperature
-    
     ltime_values = loca_tasmin_smoothed.isel(lat=lat,lon=lon).time.values
     ltemp_values = loca_tasmin_smoothed.isel(lat=lat,lon=lon).values
     ltemp_values = convert_temperature(ltemp_values, "K", "F")
@@ -280,6 +279,27 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     plt.title(f'Minimum Daily Temperature Over Time ({crop_name})')
     plt.xlabel('Time')
     plt.ylabel('Temperature (°F)')
+    plt.grid(axis='y', linestyle='--')
+    
+    # Show the plot
+    plt.show
+
+def plot_suitability(view_window, growing_season_suitability, daily_suitability, lat, lon, crop_name):
+    window_size = view_window
+    daily_suitability_smoothed = growing_season_suitability[window_size].rolling(time=7,min_periods=7).mean()
+    daily_suitability_smoothed = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.2)
+    
+    
+    plt.figure(figsize=(12, 6))
+    plt.plot(daily_suitability.isel(lat=lat,lon=lon).time.values, daily_suitability.isel(lat=lat,lon=lon), marker='o', linestyle='-', color='purple')
+    plt.plot(daily_suitability_smoothed.isel(lat=lat,lon=lon).time.values, daily_suitability_smoothed.isel(lat=lat,lon=lon), marker='o', linestyle='-', color='yellow')
+    # plt.plot(daily_suitability.isel(lat=lat,lon=lon).time.values, daily_suitability.isel(lat=lat,lon=lon), marker='o', linestyle='-', color='purple')
+    # plt.plot(growing_season_suitability[105].isel(lat=lat,lon=lon).time.values, growing_season_suitability[105].isel(lat=lat,lon=lon), marker='o', linestyle='-', color='purple')
+    plt.plot(growing_season_suitability[window_size].isel(lat=lat,lon=lon).time.values, growing_season_suitability[window_size].isel(lat=lat,lon=lon), marker='o', linestyle='-', color='green')
+    # Add labels and title
+    plt.title('Suitability ' + crop_name)
+    plt.xlabel('Time')
+    plt.ylabel('Suitability')  # Assuming tasmin is in Celsius; change if necessary
     plt.grid(axis='y', linestyle='--')
     
     # Show the plot
