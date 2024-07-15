@@ -78,8 +78,8 @@ def load_temperature_data(zip_codes):
     # (e.g., by time period or geographic region)
     lat = zip_codes["latitude"].iloc[0]
     lon = zip_codes["longitude"].iloc[0]
-    lat_slice = slice(floor(lat), ceil(lat))
-    lon_slice = slice(360+floor(lon), 360+ceil(lon))
+    lat_slice = slice(floor(lat)-1, ceil(lat)+1)
+    lon_slice = slice(360+floor(lon)-1, 360+ceil(lon)+1)
     time_slice = slice('2022-01-01', '2024-01-01')
     loca_tasmin = loca_tasmin.sel(time=time_slice, lat=lat_slice, lon=lon_slice)
     loca_tasmax = loca_tasmax.sel(time=time_slice, lat=lat_slice, lon=lon_slice)
@@ -143,9 +143,9 @@ def smooth_tas(loca_tasmin, loca_tasmax):
     
     return (loca_tasmin_smoothed, loca_tasmax_smoothed)
 
-def suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max):
+def suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance):
     # Calculate daily suitability for the entire LOCA dataset using apply_ufunc
-    frost_tolerance = 0
+    # frost_tolerance = 0
     if bolting:
         tmax = topt_max + 1
     daily_suitability = xr.apply_ufunc(
@@ -201,8 +201,8 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        daily_suitability_smoothed = suitability.rolling(time=7,min_periods=7).mean().interpolate_na(dim="time")
-        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.2).interpolate_na(dim="time",limit=10).dropna(dim="time")
+        daily_suitability_smoothed = suitability.rolling(time=7,min_periods=7).mean().interpolate_na(dim="time", limit=3)
+        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.2).interpolate_na(dim="time",limit=3).dropna(dim="time")
 
         ranges = []
         current_range = None
