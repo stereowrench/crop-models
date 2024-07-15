@@ -51,8 +51,8 @@ def add_loca_index(zip_codes, loca_tasmin, loca_tasmax):
 
 def generate_near():
     # Replace 'your_loca_tasmin_file.nc' and 'your_loca_tasmax_file.nc' with your actual file paths
-    loca_tasmin_file = 'tasmin.MPI-ESM1-2-HR.ssp245.r1i1p1f1.2015-2044.LOCA_16thdeg_v20220413.s_east.nc'
-    loca_tasmax_file = 'tasmax.MPI-ESM1-2-HR.ssp245.r1i1p1f1.2015-2044.LOCA_16thdeg_v20220413.s_east.nc'
+    loca_tasmin_file = 'tasmin.MPI-ESM1-2-HR.ssp245.r1i1p1f1.2015-2044.LOCA_16thdeg_v20220413.nc'
+    loca_tasmax_file = 'tasmax.MPI-ESM1-2-HR.ssp245.r1i1p1f1.2015-2044.LOCA_16thdeg_v20220413.nc'
     ds_tasmin = xr.open_dataset(loca_tasmin_file)
     ds_tasmax = xr.open_dataset(loca_tasmax_file)
     loca_tasmin = ds_tasmin['tasmin']
@@ -88,8 +88,8 @@ def load_temperature_data(zip_codes):
 
 def load_zip(zipcode):
     nomi = pgeocode.Nominatim('us')
-    postal_code = nomi.query_postal_code("33483")
-    zip_codes = pd.DataFrame({'ZIP': ['33483'], 
+    postal_code = nomi.query_postal_code(zipcode)
+    zip_codes = pd.DataFrame({'ZIP': [zipcode], 
                          'latitude': [postal_code['latitude']],
                          'longitude': [postal_code['longitude']]})
     return zip_codes
