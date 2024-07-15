@@ -105,9 +105,9 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     frost_tolerant_range = (tasmin >= (tmin - frost_tolerance)) & (tasmin < tmin)
 
     # Further refinement based on optimal temperature range
-    heat_stress_factor = np.exp(-((tasmax - topt_max) / (tmax - topt_max))**2)  
+    # heat_stress_factor = np.exp(-((tasmax - topt_max) / (tmax - topt_max))**2)  
 
-    suitability *= heat_stress_factor  # Reduce suitability based on heat stress
+    # suitability *= heat_stress_factor  # Reduce suitability based on heat stress
     
     optimal_range = ((topt_min < tasmin) & (tasmin < topt_max) & (topt_min < tasmax) & (tasmax < topt_max))
 
