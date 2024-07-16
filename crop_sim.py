@@ -102,16 +102,16 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     topt_min = topt_min + 273.15
     topt_max = topt_max + 273.15
     frost_temperature = 273.15
-    max_consecutive_frost_days = 3
-    max_consecutive_nippy_days = 7
-    max_consecutive_heat_days = 5
+    max_consecutive_frost_days = 1
+    max_consecutive_nippy_days = 3
+    max_consecutive_heat_days = 10
     
     # Basic suitability based on absolute thresholds
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
     frost_tolerant_range = (tasmin >= (tmin - frost_tolerance)) & (tasmin < tmin)
 
     # Identify frost days (where tasmin is below the adjusted tmin)
-    nippy_days = (tasmin < tmin).astype(int)
+    nippy_days = ((tasmin < tmin) & (tasmin > 273.15)).astype(int)
     nippy_days = pd.Series(nippy_days)
     
     frost_days = (tasmin < frost_temperature).astype(int)
@@ -152,28 +152,28 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     old_suitability = suitability.copy()
     
     suitability = xr.where(
-        (consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0),
+        ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)) | ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)) | ((consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0)),
         np.where(suitability < 0.2, 0.3, suitability),
         0
     )
     
-    suitability = xr.where(
-        (consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0),
-        np.where(old_suitability < 0.2, 0.3, old_suitability),
-        0
-    )
+    # suitability = xr.where(
+    #     ,
+    #     np.where(old_suitability < 0.2, 0.3, old_suitability),
+    #     0
+    # )
 
-    suitability = xr.where(
-        (consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0),
-        np.where(old_suitability < 0.2, 0.3, old_suitability),
-        0
-    )
+    # suitability = xr.where(
+    #     (consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0),
+    #     np.where(old_suitability < 0.2, 0.3, old_suitability),
+    #     0
+    # )
 
-    suitability = xr.where(
-        (consecutive_frost_days == 0) | (consecutive_nippy_days == 0) | (consecutive_heat_days == 0),
-        old_suitability,
-        suitability
-    )
+    # suitability = xr.where(
+    #     (consecutive_frost_days == 0) | (consecutive_nippy_days == 0) | (consecutive_heat_days == 0),
+    #     old_suitability,
+    #     suitability
+    # )
     
     # Ensure suitability is within 0-1 range
     suitability = suitability.clip(0, 1)
