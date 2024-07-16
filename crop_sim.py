@@ -104,7 +104,7 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     frost_temperature = 273.15
     max_consecutive_frost_days = 1
     max_consecutive_nippy_days = 3
-    max_consecutive_heat_days = 10
+    max_consecutive_heat_days = 5
     
     # Basic suitability based on absolute thresholds
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
@@ -153,7 +153,7 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     
     suitability = xr.where(
         ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)) | ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)) | ((consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0)),
-        np.where(suitability < 0.2, 0.3, suitability),
+        np.where(suitability < 0.2, 0.1, suitability),
         0
     )
     
@@ -169,11 +169,11 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     #     0
     # )
 
-    # suitability = xr.where(
-    #     (consecutive_frost_days == 0) | (consecutive_nippy_days == 0) | (consecutive_heat_days == 0),
-    #     old_suitability,
-    #     suitability
-    # )
+    suitability = xr.where(
+        (consecutive_frost_days == 0) & (consecutive_nippy_days == 0) & (consecutive_heat_days == 0),
+        old_suitability,
+        suitability
+    )
     
     # Ensure suitability is within 0-1 range
     suitability = suitability.clip(0, 1)
