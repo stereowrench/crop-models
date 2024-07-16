@@ -103,22 +103,33 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     topt_max = topt_max + 273.15
     frost_temperature = 273.15
     max_consecutive_frost_days = 3
+    max_consecutive_nippy_days = 7
+    max_consecutive_heat_days = 5
     
     # Basic suitability based on absolute thresholds
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
     frost_tolerant_range = (tasmin >= (tmin - frost_tolerance)) & (tasmin < tmin)
 
-    frost_days = (tasmin < tmin).astype(int)
+    # Identify frost days (where tasmin is below the adjusted tmin)
+    nippy_days = (tasmin < tmin).astype(int)
+    nippy_days = pd.Series(nippy_days)
     
-    # Calculate consecutive frost days using NumPy convolve
-    kernel = np.ones(max_consecutive_frost_days)  # Kernel of all ones
-    consecutive_frost_days = convolve1d(frost_days, kernel, mode='constant', cval=0)  
+    frost_days = (tasmin < frost_temperature).astype(int)
+    frost_days = pd.Series(frost_days)
 
-    # Apply frost tolerance (only if consecutive frost days are within the limit)
-    suitability = xr.where(
-        consecutive_frost_days <= max_consecutive_frost_days, suitability, 0.0
-    )
+    heat_days = (tasmax > tmax).astype(int)
+    heat_days = pd.Series(heat_days)
     
+    # Calculate consecutive frost days using pandas rolling and sum
+    consecutive_frost_days = frost_days.rolling(window=max_consecutive_frost_days, min_periods=1).sum().to_numpy()
+    consecutive_nippy_days = nippy_days.rolling(window=max_consecutive_nippy_days, min_periods=1).sum().to_numpy()
+    consecutive_heat_days = heat_days.rolling(window=max_consecutive_heat_days, min_periods=1).sum().to_numpy()
+
+    # plot_nippy(consecutive_nippy_days)
+
+    # Convert back to xarray DataArray if needed
+    # consecutive_frost_days = xr.DataArray(consecutive_frost_days, coords=[tasmin.time], dims="time")
+
     # Further refinement based on optimal temperature range
     # heat_stress_factor = np.exp(-((tasmax - topt_max) / (tmax - topt_max))**2)  
 
@@ -126,12 +137,6 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     
     optimal_range = ((topt_min < tasmin) & (tasmin < topt_max) & (topt_min < tasmax) & (tasmax < topt_max))
 
-    # Linear interpolation between thresholds
-    suitability = xr.where(
-        consecutive_frost_days <= max_consecutive_frost_days,
-        suitability,  # Keep original suitability if within tolerance
-        0.0  # Set suitability to 0 if exceeding tolerance
-    )
     suitability = xr.where(optimal_range, 1.0, suitability)  # Optimal range has perfect suitability (1.0)
     suitability = xr.where(
         (tasmin < topt_min) & ~frost_tolerant_range,
@@ -144,11 +149,48 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
         suitability
     )
 
+    old_suitability = suitability.copy()
+    
+    suitability = xr.where(
+        (consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0),
+        np.where(suitability < 0.2, 0.3, suitability),
+        0
+    )
+    
+    suitability = xr.where(
+        (consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0),
+        np.where(old_suitability < 0.2, 0.3, old_suitability),
+        0
+    )
+
+    suitability = xr.where(
+        (consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0),
+        np.where(old_suitability < 0.2, 0.3, old_suitability),
+        0
+    )
+
+    suitability = xr.where(
+        (consecutive_frost_days == 0) | (consecutive_nippy_days == 0) | (consecutive_heat_days == 0),
+        old_suitability,
+        suitability
+    )
+    
     # Ensure suitability is within 0-1 range
     suitability = suitability.clip(0, 1)
 
     return suitability
 
+# def plot_nippy(nippy):
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(nippy)
+    # plt.plot(ltime_values, , marker='o', linestyle='-', color='blue')
+    # plt.plot(utime_values, utemp_values, marker='o', linestyle='-', color='green')
+    # plt.axhline(y = ftmin, color = 'r', linestyle = '-') 
+    # plt.axhline(y = ftmax, color = 'r', linestyle = '-') 
+    # plt.axhline(y = ftopt_min, color = 'y', linestyle = '-') 
+    # plt.axhline(y = ftopt_max, color = 'y', linestyle = '-')
+    # plt.show()
+    
 def smooth_tas(loca_tasmin, loca_tasmax):
     # Define a threshold for outlier detection (e.g., 3 standard deviations)
     z_threshold = 3
