@@ -263,8 +263,8 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        daily_suitability_smoothed = suitability.rolling(time=7,min_periods=7).mean().interpolate_na(dim="time", limit=3)
-        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.2).interpolate_na(dim="time",limit=3).dropna(dim="time")
+        daily_suitability_smoothed = suitability.rolling(time=14).mean().interpolate_na(dim="time", limit=3)
+        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=3).dropna(dim="time")
 
         ranges = []
         current_range = None
@@ -279,14 +279,15 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     
             if days >= 360:
                 ranges.append([pd.Timestamp("20230101"), pd.Timestamp("20231231")])
-            elif (de + pd.Timedelta(window_size, "d")).date() > datetime.date(2024,1,1):
+            elif de.date() >= datetime.date(2024,1,1):
                 pass
-            elif (ds - pd.Timedelta(window_size, "d")).date() < datetime.date(2022,1,1):
+            elif ds.date() <= datetime.date(2022,1,1):
                 pass
             else:
                 # print([days, window_size, ds, de])
                 if days >= window_size:
-                    if days - window_size < 7:
+                    print(days - window_size)
+                    if days - window_size < 14:
                         pass
                     else:
                         ranges.append([ds, de - pd.Timedelta(window_size + 7, "d")])
