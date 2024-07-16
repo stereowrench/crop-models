@@ -11,6 +11,8 @@ from matplotlib.patches import Rectangle
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 from scipy.constants import convert_temperature
+from scipy.ndimage import convolve1d
+
 
 def load_ecocrop():
     # Replace 'your_ecocrop_file.csv' with your actual file path
@@ -99,11 +101,24 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     tmax = tmax + 273.15
     topt_min = topt_min + 273.15
     topt_max = topt_max + 273.15
+    frost_temperature = 273.15
+    max_consecutive_frost_days = 3
+    
     # Basic suitability based on absolute thresholds
-
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
     frost_tolerant_range = (tasmin >= (tmin - frost_tolerance)) & (tasmin < tmin)
 
+    frost_days = (tasmin < tmin).astype(int)
+    
+    # Calculate consecutive frost days using NumPy convolve
+    kernel = np.ones(max_consecutive_frost_days)  # Kernel of all ones
+    consecutive_frost_days = convolve1d(frost_days, kernel, mode='constant', cval=0)  
+
+    # Apply frost tolerance (only if consecutive frost days are within the limit)
+    suitability = xr.where(
+        consecutive_frost_days <= max_consecutive_frost_days, suitability, 0.0
+    )
+    
     # Further refinement based on optimal temperature range
     # heat_stress_factor = np.exp(-((tasmax - topt_max) / (tmax - topt_max))**2)  
 
@@ -112,6 +127,11 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     optimal_range = ((topt_min < tasmin) & (tasmin < topt_max) & (topt_min < tasmax) & (tasmax < topt_max))
 
     # Linear interpolation between thresholds
+    suitability = xr.where(
+        consecutive_frost_days <= max_consecutive_frost_days,
+        suitability,  # Keep original suitability if within tolerance
+        0.0  # Set suitability to 0 if exceeding tolerance
+    )
     suitability = xr.where(optimal_range, 1.0, suitability)  # Optimal range has perfect suitability (1.0)
     suitability = xr.where(
         (tasmin < topt_min) & ~frost_tolerant_range,
