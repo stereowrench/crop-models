@@ -121,9 +121,18 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     heat_days = pd.Series(heat_days)
     
     # Calculate consecutive frost days using pandas rolling and sum
-    consecutive_frost_days = frost_days.rolling(window=max_consecutive_frost_days, min_periods=1).sum().to_numpy()
-    consecutive_nippy_days = nippy_days.rolling(window=max_consecutive_nippy_days, min_periods=1).sum().to_numpy()
+    # consecutive_frost_days = frost_days.rolling(window=max_consecutive_frost_days, min_periods=1).sum().to_numpy()
+    # consecutive_nippy_days = nippy_days.rolling(window=max_consecutive_nippy_days, min_periods=1).sum().to_numpy()
     consecutive_heat_days = heat_days.rolling(window=max_consecutive_heat_days, min_periods=1).sum().to_numpy()
+
+    groups = heat_days.cumsum()
+    group_sizes = groups.groupby(groups).count()
+    extended_heat_mask = np.ones_like(groups, dtype=bool)
+    for group_number, size in group_sizes.items():  # Convert to Pandas for easier iteration
+        if size > max_consecutive_heat_days:
+            extended_heat_mask = np.where(groups == group_number, False, extended_heat_mask)
+    
+
     
     # plot_nippy(consecutive_nippy_days)
 
@@ -164,7 +173,7 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     # )
 
     suitability = xr.where(
-        ((consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0)),
+        extended_heat_mask,
         np.where(suitability < 0.2, 0.2, suitability),
         suitability
     )
@@ -181,11 +190,11 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     #     0
     # )
 
-    suitability = xr.where(
-        (consecutive_frost_days == 0) & (consecutive_nippy_days == 0) & (consecutive_heat_days == 0),
-        old_suitability,
-        suitability
-    )
+    # suitability = xr.where(
+    #     (consecutive_frost_days == 0) & (consecutive_nippy_days == 0) & (consecutive_heat_days == 0),
+    #     old_suitability,
+    #     suitability
+    # )
     
     # Ensure suitability is within 0-1 range
     suitability = suitability.clip(0, 1)
