@@ -102,9 +102,9 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     topt_min = topt_min + 273.15
     topt_max = topt_max + 273.15
     frost_temperature = 273.15
-    max_consecutive_frost_days = 1
-    max_consecutive_nippy_days = 1
-    max_consecutive_heat_days = 3
+    max_consecutive_frost_days = 3
+    max_consecutive_nippy_days = 3
+    max_consecutive_heat_days = 7
     
     # Basic suitability based on absolute thresholds
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
@@ -263,8 +263,8 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        daily_suitability_smoothed = suitability.rolling(time=14, center=True).mean().interpolate_na(dim="time", limit=3)
-        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=3).dropna(dim="time")
+        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=14, center=True).mean()
+        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=7).dropna(dim="time")
 
         ranges = []
         current_range = None
@@ -339,7 +339,7 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     yellow_patch = mpatches.Patch(color='yellow', alpha=0.5, label=f'Growing Season Length: {view_window}')
     
     # Add legend
-    plt.legend(handles=[blue_line, green_line, red_line, yellow_line, blue_patch, yellow_patch], loc='upper left')
+    plt.legend(handles=[blue_line, green_line, red_line, yellow_line, blue_patch, yellow_patch], loc='upper left', bbox_to_anchor=(1.04, 1))
     
     # Add labels and title
     plt.title(f'Minimum Daily Temperature Over Time ({crop_name})')
@@ -393,6 +393,15 @@ def return_last(m1, d1, m2, d2):
     else:
         return (m1, d1)
 
+def fix_wraparound(w):
+    (m1, d1, m2, d2) = w
+    if m1 > 12:
+        m1 -= 12
+    if m2 > 12:
+        m2 -= 12
+
+    return (m1, d1, m2, d2)
+
 
 def merge_overlapping_monthday_ranges(date_ranges):
     """Converts date ranges to month-day format and merges overlapping ranges.
@@ -408,7 +417,8 @@ def merge_overlapping_monthday_ranges(date_ranges):
     # month_day_ranges.sort()  
 
     month_day_ranges = [(start.month, start.day, end.month, end.day) for [start, end] in date_ranges]
-
+    month_day_ranges.sort()
+    
     merged_ranges = []
     current_range = month_day_ranges[0]
     
@@ -422,24 +432,20 @@ def merge_overlapping_monthday_ranges(date_ranges):
         if ((start_month1 < end_month2 or (start_month1 == end_month2 and start_day1 <= end_day2)) and
             (end_month1 > start_month2 or (end_month1 == start_month2 and end_day1 >= start_day2))):
             # Overlapping range - extend the end
-            current_range = return_first(start_month1, start_day1, start_month2, start_day2) + return_first(end_month1, end_day1, end_month2, end_day2)
+            current_range = fix_wraparound(eturn_first(start_month1, start_day1, start_month2, start_day2) + return_last(end_month1, end_day1, end_month2, end_day2))
             # current_range = (start_month1, start_day1, end_month2, end_day2)
         # Range 1 is fully contained within Range 2:
         elif ((start_month1 >= start_month2 and start_day1 >= start_day2) and
             (end_month1 <= end_month2 and end_day1 <= end_day2)):
-            current_range = (start_month2, start_day2, end_month2, end_day2)
+            current_range = fix_wraparound((start_month2, start_day2, end_month2, end_day2))
         # Range 2 is fully contained within Range 1:
         elif ((start_month2 >= start_month1 and start_day2 >= start_day1) and
             (end_month2 <= end_month1 and end_day2 <= end_day1)):
-            current_range = (start_month1, start_day1, end_month1, end_day1)
+            current_range = fix_wraparound((start_month1, start_day1, end_month1, end_day1))
         else:
             # New range - add the current range and start a new one
             merged_ranges.append(current_range)
-            if end_month1 > 12:
-                end_month1 -= 12
-            if end_month2 > 12:
-                end_month2 -= 12
-            current_range = (start_month2, start_day2, end_month2, end_day2)
+            current_range = fix_wraparound((start_month2, start_day2, end_month2, end_day2))
 
     merged_ranges.append(current_range)  # Add the last range
 
