@@ -457,6 +457,38 @@ def merge_overlapping_monthday_ranges(date_ranges):
         elif ((start_month2 >= start_month1 and start_day2 >= start_day1) and
             (end_month2 <= end_month1 and end_day2 <= end_day1)):
             current_range = fix_wraparound((start_month1, start_day1, end_month1, end_day1))
+        elif (end_month2 > 12 and end_month1 <= 12):
+            start_month1 += 12
+            end_month1 += 12
+            if ((start_month1 < end_month2 or (start_month1 == end_month2 and start_day1 <= end_day2)) and
+                (end_month1 > start_month2 or (end_month1 == start_month2 and end_day1 >= start_day2))):
+                # Overlapping range - extend the end
+                current_range = fix_wraparound(return_first(start_month1, start_day1, start_month2, start_day2) + return_last(end_month1, end_day1, end_month2, end_day2))
+                # current_range = (start_month1, start_day1, end_month2, end_day2)
+            # Range 1 is fully contained within Range 2:
+            elif ((start_month1 >= start_month2 and start_day1 >= start_day2) and
+                (end_month1 <= end_month2 and end_day1 <= end_day2)):
+                current_range = fix_wraparound((start_month2, start_day2, end_month2, end_day2))
+            # Range 2 is fully contained within Range 1:
+            elif ((start_month2 >= start_month1 and start_day2 >= start_day1) and
+                (end_month2 <= end_month1 and end_day2 <= end_day1)):
+                current_range = fix_wraparound((start_month1, start_day1, end_month1, end_day1))
+        elif (end_month2 <= 12 and end_month1 > 12):
+            start_month2 += 12
+            end_month2 += 12
+            if ((start_month1 < end_month2 or (start_month1 == end_month2 and start_day1 <= end_day2)) and
+                (end_month1 > start_month2 or (end_month1 == start_month2 and end_day1 >= start_day2))):
+                # Overlapping range - extend the end
+                current_range = fix_wraparound(return_first(start_month1, start_day1, start_month2, start_day2) + return_last(end_month1, end_day1, end_month2, end_day2))
+                # current_range = (start_month1, start_day1, end_month2, end_day2)
+            # Range 1 is fully contained within Range 2:
+            elif ((start_month1 >= start_month2 and start_day1 >= start_day2) and
+                (end_month1 <= end_month2 and end_day1 <= end_day2)):
+                current_range = fix_wraparound((start_month2, start_day2, end_month2, end_day2))
+            # Range 2 is fully contained within Range 1:
+            elif ((start_month2 >= start_month1 and start_day2 >= start_day1) and
+                (end_month2 <= end_month1 and end_day2 <= end_day1)):
+                current_range = fix_wraparound((start_month1, start_day1, end_month1, end_day1))
         else:
             # New range - add the current range and start a new one
             merged_ranges.append(current_range)
