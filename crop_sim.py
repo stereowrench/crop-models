@@ -102,8 +102,8 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     topt_min = topt_min + 273.15
     topt_max = topt_max + 273.15
     frost_temperature = 273.15
-    max_consecutive_frost_days = 3
-    max_consecutive_nippy_days = 3
+    max_consecutive_frost_days = 1
+    max_consecutive_nippy_days = 1
     max_consecutive_heat_days = 7
     
     # Basic suitability based on absolute thresholds
@@ -124,7 +124,7 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     consecutive_frost_days = frost_days.rolling(window=max_consecutive_frost_days, min_periods=1).sum().to_numpy()
     consecutive_nippy_days = nippy_days.rolling(window=max_consecutive_nippy_days, min_periods=1).sum().to_numpy()
     consecutive_heat_days = heat_days.rolling(window=max_consecutive_heat_days, min_periods=1).sum().to_numpy()
-
+    
     # plot_nippy(consecutive_nippy_days)
 
     # Convert back to xarray DataArray if needed
@@ -151,10 +151,22 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
 
     old_suitability = suitability.copy()
     
+    # suitability = xr.where(
+    #     ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
+  
+    # suitability = xr.where(
+    #     ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
+
     suitability = xr.where(
-        ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)) | ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)) | ((consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0)),
-        np.where(suitability < 0.2, 0.1, suitability),
-        0
+        ((consecutive_heat_days <= max_consecutive_heat_days) & (consecutive_heat_days > 0)),
+        np.where(suitability < 0.2, 0.2, suitability),
+        suitability
     )
     
     # suitability = xr.where(
@@ -193,15 +205,18 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     
 def smooth_tas(loca_tasmin, loca_tasmax):
     # Define a threshold for outlier detection (e.g., 3 standard deviations)
-    z_threshold = 3
+    # z_threshold = 
     
-    # Calculate z-scores for tasmin and tasmax
-    tasmin_zscores = (loca_tasmin - loca_tasmin.mean(dim='time')) / loca_tasmin.std(dim='time')
-    tasmax_zscores = (loca_tasmax - loca_tasmax.mean(dim='time')) / loca_tasmax.std(dim='time')
+    # # Calculate z-scores for tasmin and tasmax
+    # tasmin_zscores = (loca_tasmin - loca_tasmin.mean(dim='time')) / loca_tasmin.std(dim='time')
+    # tasmax_zscores = (loca_tasmax - loca_tasmax.mean(dim='time')) / loca_tasmax.std(dim='time')
     
-    # Mask outliers based on z-score threshold
-    loca_tasmin_smoothed = loca_tasmin.where(np.abs(tasmin_zscores) < z_threshold)
-    loca_tasmax_smoothed = loca_tasmax.where(np.abs(tasmax_zscores) < z_threshold)
+    # # Mask outliers based on z-score threshold
+    # loca_tasmin_smoothed = loca_tasmin.where(np.abs(tasmin_zscores) < z_threshold)
+    # loca_tasmax_smoothed = loca_tasmax.where(np.abs(tasmax_zscores) < z_threshold)
+
+    loca_tasmin_smoothed =  loca_tasmin.rolling(time=7, center=True).mean()
+    loca_tasmax_smoothed =  loca_tasmax.rolling(time=7, center=True).mean()
     
     return (loca_tasmin_smoothed, loca_tasmax_smoothed)
 
@@ -263,8 +278,8 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=14, center=True).mean()
-        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=7).dropna(dim="time")
+        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=3).rolling(time=14, center=True).mean()
+        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=3).dropna(dim="time")
 
         ranges = []
         current_range = None
@@ -313,8 +328,8 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     # print(temp_values)
     # Create the plot
     fig, ax1 = plt.subplots(figsize=(12, 6))
-    ax1.plot(ltime_values, ltemp_values, marker='o', linestyle='-', color='blue')
-    ax1.plot(utime_values, utemp_values, marker='o', linestyle='-', color='green')
+    ax1.plot(ltime_values, ltemp_values, linestyle='-', color='blue')
+    ax1.plot(utime_values, utemp_values, linestyle='-', color='green')
     ax1.axhline(y = ftmin, color = 'r', linestyle = '-') 
     ax1.axhline(y = ftmax, color = 'r', linestyle = '-') 
     ax1.axhline(y = ftopt_min, color = 'y', linestyle = '-') 
@@ -331,8 +346,8 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
         ax1.add_patch(Rectangle((d2, 40), datetime.timedelta(days=view_window), 95-40, color="yellow"))
     
     # Create legend elements
-    blue_line = mlines.Line2D([0], [0], color='blue', lw=2, label='Lower Temperature Threshold', marker='o')
-    green_line = mlines.Line2D([0], [0], color='green', lw=2, label='Upper Temperature Threshold', marker='o')
+    blue_line = mlines.Line2D([0], [0], color='blue', lw=2, label='Lower Temperature Threshold')
+    green_line = mlines.Line2D([0], [0], color='green', lw=2, label='Upper Temperature Threshold')
     red_line = mlines.Line2D([0], [0], color='red', lw=2, linestyle='-', label='Absolute Temperature Limit')
     yellow_line = mlines.Line2D([0], [0], color='yellow', lw=2, linestyle='-', label='Optimal Temperature Range')
     blue_patch = mpatches.Patch(color='blue', alpha=0.5, label='Suitable Planting Period')
@@ -352,16 +367,16 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
 
 def plot_suitability(view_window, growing_season_suitability, daily_suitability, lat, lon, crop_name):
     window_size = view_window
-    daily_suitability_smoothed = growing_season_suitability[window_size].rolling(time=7,min_periods=7).mean()
-    daily_suitability_smoothed = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.2)
+    daily_suitability_smoothed = growing_season_suitability[window_size].interpolate_na(dim="time", limit=3).rolling(time=14, center=True).mean()
+    daily_suitability_smoothed = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15)
     
     
     plt.figure(figsize=(12, 6))
-    plt.plot(daily_suitability.isel(lat=lat,lon=lon).time.values, daily_suitability.isel(lat=lat,lon=lon), marker='o', linestyle='-', color='purple')
-    plt.plot(daily_suitability_smoothed.isel(lat=lat,lon=lon).time.values, daily_suitability_smoothed.isel(lat=lat,lon=lon), marker='o', linestyle='-', color='yellow')
+    plt.plot(daily_suitability.isel(lat=lat,lon=lon).time.values, daily_suitability.isel(lat=lat,lon=lon), linestyle='-', color='purple')
+    plt.plot(daily_suitability_smoothed.isel(lat=lat,lon=lon).time.values, daily_suitability_smoothed.isel(lat=lat,lon=lon), linestyle='-', color='yellow')
     # plt.plot(daily_suitability.isel(lat=lat,lon=lon).time.values, daily_suitability.isel(lat=lat,lon=lon), marker='o', linestyle='-', color='purple')
     # plt.plot(growing_season_suitability[105].isel(lat=lat,lon=lon).time.values, growing_season_suitability[105].isel(lat=lat,lon=lon), marker='o', linestyle='-', color='purple')
-    plt.plot(growing_season_suitability[window_size].isel(lat=lat,lon=lon).time.values, growing_season_suitability[window_size].isel(lat=lat,lon=lon), marker='o', linestyle='-', color='green')
+    plt.plot(growing_season_suitability[window_size].isel(lat=lat,lon=lon).time.values, growing_season_suitability[window_size].isel(lat=lat,lon=lon),  linestyle='-', color='green')
     # Add labels and title
     plt.title('Suitability ' + crop_name)
     plt.xlabel('Time')
@@ -432,7 +447,7 @@ def merge_overlapping_monthday_ranges(date_ranges):
         if ((start_month1 < end_month2 or (start_month1 == end_month2 and start_day1 <= end_day2)) and
             (end_month1 > start_month2 or (end_month1 == start_month2 and end_day1 >= start_day2))):
             # Overlapping range - extend the end
-            current_range = fix_wraparound(eturn_first(start_month1, start_day1, start_month2, start_day2) + return_last(end_month1, end_day1, end_month2, end_day2))
+            current_range = fix_wraparound(return_first(start_month1, start_day1, start_month2, start_day2) + return_last(end_month1, end_day1, end_month2, end_day2))
             # current_range = (start_month1, start_day1, end_month2, end_day2)
         # Range 1 is fully contained within Range 2:
         elif ((start_month1 >= start_month2 and start_day1 >= start_day2) and
