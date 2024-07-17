@@ -279,7 +279,7 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
         daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=14, center=True).mean()
-        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=7).dropna(dim="time")
+        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.2).interpolate_na(dim="time",limit=7).dropna(dim="time")
 
         ranges = []
         current_range = None
