@@ -103,8 +103,8 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     topt_max = topt_max + 273.15
     frost_temperature = 273.15
     max_consecutive_frost_days = 1
-    max_consecutive_nippy_days = 3
-    max_consecutive_heat_days = 5
+    max_consecutive_nippy_days = 1
+    max_consecutive_heat_days = 3
     
     # Basic suitability based on absolute thresholds
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
@@ -263,7 +263,7 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        daily_suitability_smoothed = suitability.rolling(time=14).mean().interpolate_na(dim="time", limit=3)
+        daily_suitability_smoothed = suitability.rolling(time=14, center=True).mean().interpolate_na(dim="time", limit=3)
         suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=3).dropna(dim="time")
 
         ranges = []
@@ -296,7 +296,7 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     
     return optimal_planting_ranges
 
-def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, view_window, optimal_planting_ranges, lat, lon, crop_name):
+def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, view_window, optimal_planting_ranges, lat, lon, crop_name, day_lengths, dates):
     ltime_values = loca_tasmin_smoothed.isel(lat=lat,lon=lon).time.values
     ltemp_values = loca_tasmin_smoothed.isel(lat=lat,lon=lon).values
     ltemp_values = convert_temperature(ltemp_values, "K", "F")
@@ -312,20 +312,23 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     
     # print(temp_values)
     # Create the plot
-    plt.figure(figsize=(12, 6))
-    plt.plot(ltime_values, ltemp_values, marker='o', linestyle='-', color='blue')
-    plt.plot(utime_values, utemp_values, marker='o', linestyle='-', color='green')
-    plt.axhline(y = ftmin, color = 'r', linestyle = '-') 
-    plt.axhline(y = ftmax, color = 'r', linestyle = '-') 
-    plt.axhline(y = ftopt_min, color = 'y', linestyle = '-') 
-    plt.axhline(y = ftopt_max, color = 'y', linestyle = '-')
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    ax1.plot(ltime_values, ltemp_values, marker='o', linestyle='-', color='blue')
+    ax1.plot(utime_values, utemp_values, marker='o', linestyle='-', color='green')
+    ax1.axhline(y = ftmin, color = 'r', linestyle = '-') 
+    ax1.axhline(y = ftmax, color = 'r', linestyle = '-') 
+    ax1.axhline(y = ftopt_min, color = 'y', linestyle = '-') 
+    ax1.axhline(y = ftopt_max, color = 'y', linestyle = '-')
+
+    ax2 = ax1.twinx()
+    ax2.plot(dates, day_lengths)
     
     ax = plt.gca()
     
     for dates in optimal_planting_ranges[view_window]:
         [d1,d2] = dates
-        ax.add_patch(Rectangle((d1, 40), d2-d1, 95-40))
-        ax.add_patch(Rectangle((d2, 40), datetime.timedelta(days=view_window), 95-40, color="yellow"))
+        ax1.add_patch(Rectangle((d1, 40), d2-d1, 95-40))
+        ax1.add_patch(Rectangle((d2, 40), datetime.timedelta(days=view_window), 95-40, color="yellow"))
     
     # Create legend elements
     blue_line = mlines.Line2D([0], [0], color='blue', lw=2, label='Lower Temperature Threshold', marker='o')
@@ -340,12 +343,12 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     
     # Add labels and title
     plt.title(f'Minimum Daily Temperature Over Time ({crop_name})')
-    plt.xlabel('Time')
-    plt.ylabel('Temperature (°F)')
-    plt.grid(axis='y', linestyle='--')
-    
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Temperature (°F)')
+    # plt.grid(axis='y', linestyle='--')
+    fig.tight_layout()
     # Show the plot
-    plt.show
+    plt.show()
 
 def plot_suitability(view_window, growing_season_suitability, daily_suitability, lat, lon, crop_name):
     window_size = view_window
@@ -367,6 +370,29 @@ def plot_suitability(view_window, growing_season_suitability, daily_suitability,
     
     # Show the plot
     plt.show()
+
+def return_first(m1, d1, m2, d2):
+    if m1 == m2:
+        if d1 > d2:
+            return (m2, d2)
+        else:
+            return (m1, d1)
+    elif m1 > m2:
+        return (m2, d2)
+    else:
+        return (m1, d1)
+        
+def return_last(m1, d1, m2, d2):
+    if m1 == m2:
+        if d1 < d2:
+            return (m2, d2)
+        else:
+            return (m1, d1)
+    elif m1 < m2:
+        return (m2, d2)
+    else:
+        return (m1, d1)
+
 
 def merge_overlapping_monthday_ranges(date_ranges):
     """Converts date ranges to month-day format and merges overlapping ranges.
@@ -396,7 +422,8 @@ def merge_overlapping_monthday_ranges(date_ranges):
         if ((start_month1 < end_month2 or (start_month1 == end_month2 and start_day1 <= end_day2)) and
             (end_month1 > start_month2 or (end_month1 == start_month2 and end_day1 >= start_day2))):
             # Overlapping range - extend the end
-            current_range = (start_month1, start_day1, end_month2, end_day2)
+            current_range = return_first(start_month1, start_day1, start_month2, start_day2) + return_first(end_month1, end_day1, end_month2, end_day2)
+            # current_range = (start_month1, start_day1, end_month2, end_day2)
         # Range 1 is fully contained within Range 2:
         elif ((start_month1 >= start_month2 and start_day1 >= start_day2) and
             (end_month1 <= end_month2 and end_day1 <= end_day2)):
