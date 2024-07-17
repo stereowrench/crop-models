@@ -102,9 +102,9 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     topt_min = topt_min + 273.15
     topt_max = topt_max + 273.15
     frost_temperature = 273.15
-    max_consecutive_frost_days = 1
-    max_consecutive_nippy_days = 1
-    max_consecutive_heat_days = 7
+    max_consecutive_frost_days = 3
+    max_consecutive_nippy_days = 3
+    max_consecutive_heat_days = 3
     
     # Basic suitability based on absolute thresholds
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
@@ -121,18 +121,9 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     heat_days = pd.Series(heat_days)
     
     # Calculate consecutive frost days using pandas rolling and sum
-    # consecutive_frost_days = frost_days.rolling(window=max_consecutive_frost_days, min_periods=1).sum().to_numpy()
-    # consecutive_nippy_days = nippy_days.rolling(window=max_consecutive_nippy_days, min_periods=1).sum().to_numpy()
-    consecutive_heat_days = heat_days.rolling(window=max_consecutive_heat_days, min_periods=1).sum().to_numpy()
-
-    groups = heat_days.cumsum()
-    group_sizes = groups.groupby(groups).count()
-    extended_heat_mask = np.ones_like(groups, dtype=bool)
-    for group_number, size in group_sizes.items():  # Convert to Pandas for easier iteration
-        if size > max_consecutive_heat_days:
-            extended_heat_mask = np.where(groups == group_number, False, extended_heat_mask)
-    
-
+    consecutive_frost_days = frost_days.rolling(window=7, min_periods=1).sum().to_numpy()
+    consecutive_nippy_days = nippy_days.rolling(window=7, min_periods=1).sum().to_numpy()
+    consecutive_heat_days = heat_days.rolling(window=7, min_periods=1).sum().to_numpy()
     
     # plot_nippy(consecutive_nippy_days)
 
@@ -158,22 +149,22 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
         suitability
     )
 
-    old_suitability = suitability.copy()
+    # old_suitability = suitability.copy()
     
-    # suitability = xr.where(
-    #     ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
-    #     np.where(suitability < 0.2, 0.2, suitability),
-    #     suitability
-    # )
+    suitability = xr.where(
+        ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
+        np.where(suitability < 0.2, 0.2, suitability),
+        suitability
+    )
   
-    # suitability = xr.where(
-    #     ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
-    #     np.where(suitability < 0.2, 0.2, suitability),
-    #     suitability
-    # )
+    suitability = xr.where(
+        ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
+        np.where(suitability < 0.2, 0.2, suitability),
+        suitability
+    )
 
     suitability = xr.where(
-        extended_heat_mask,
+        (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
         np.where(suitability < 0.2, 0.2, suitability),
         suitability
     )
@@ -287,8 +278,8 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=3).rolling(time=14, center=True).mean()
-        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=3).dropna(dim="time")
+        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=14, center=True).mean()
+        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15).interpolate_na(dim="time",limit=7).dropna(dim="time")
 
         ranges = []
         current_range = None
