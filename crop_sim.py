@@ -278,7 +278,7 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        cutoff = suitability.quantile(0.3)
+        cutoff = suitability.quantile(0.2)
         daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=30, center=True).mean()
         suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > cutoff).interpolate_na(dim="time",limit=7).dropna(dim="time")
 
@@ -369,10 +369,12 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
 def plot_suitability(view_window, growing_season_suitability, daily_suitability, lat, lon, crop_name):
     window_size = view_window
     daily_suitability_smoothed = growing_season_suitability[window_size].interpolate_na(dim="time", limit=3).rolling(time=30, center=True).mean()
-    daily_suitability_smoothed = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15)
+    cutoff = daily_suitability_smoothed.isel(lat=lat,lon=lon).quantile(0.2)
+    daily_suitability_smoothed = daily_suitability_smoothed.where(daily_suitability_smoothed > cutoff)
     
     
     plt.figure(figsize=(12, 6))
+    plt.axhline(y = cutoff, color = 'y', linestyle = '-') 
     plt.plot(daily_suitability.isel(lat=lat,lon=lon).time.values, daily_suitability.isel(lat=lat,lon=lon), linestyle='-', color='purple')
     plt.plot(daily_suitability_smoothed.isel(lat=lat,lon=lon).time.values, daily_suitability_smoothed.isel(lat=lat,lon=lon), linestyle='-', color='yellow')
     # plt.plot(daily_suitability.isel(lat=lat,lon=lon).time.values, daily_suitability.isel(lat=lat,lon=lon), marker='o', linestyle='-', color='purple')
