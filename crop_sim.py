@@ -249,7 +249,7 @@ def calculate_season_suitability(gmin, gmax, daily_suitability):
     
     
         # Slice out the original data's suitability after the circular rolling
-        growing_season_suitability[window_size] = season_suitability
+        growing_season_suitability[window_size] = season_suitability.where(season_suitability > 0)
     return growing_season_suitability
     
 def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
@@ -278,8 +278,9 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=14, center=True).mean()
-        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.2).interpolate_na(dim="time",limit=7).dropna(dim="time")
+        cutoff = suitability.quantile(0.3)
+        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=30, center=True).mean()
+        suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > cutoff).interpolate_na(dim="time",limit=7).dropna(dim="time")
 
         ranges = []
         current_range = None
@@ -367,7 +368,7 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
 
 def plot_suitability(view_window, growing_season_suitability, daily_suitability, lat, lon, crop_name):
     window_size = view_window
-    daily_suitability_smoothed = growing_season_suitability[window_size].interpolate_na(dim="time", limit=3).rolling(time=14, center=True).mean()
+    daily_suitability_smoothed = growing_season_suitability[window_size].interpolate_na(dim="time", limit=3).rolling(time=30, center=True).mean()
     daily_suitability_smoothed = daily_suitability_smoothed.where(daily_suitability_smoothed > 0.15)
     
     
