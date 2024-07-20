@@ -163,11 +163,11 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     #     suitability
     # )
 
-    # suitability = xr.where(
-    #     (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
-    #     np.where(suitability < 0.2, 0.2, suitability),
-    #     suitability
-    # )
+    suitability = xr.where(
+        (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
+        np.where(suitability < 0.2, 0.2, suitability),
+        suitability
+    )
     
     # suitability = xr.where(
     #     ,
