@@ -504,3 +504,114 @@ def merge_overlapping_monthday_ranges(date_ranges):
     merged_ranges.append(current_range)  # Add the last range
 
     return merged_ranges
+
+def generate_day_lengths(zip_codes):
+    import ephem
+    import datetime
+    
+    observer = ephem.Observer()
+    observer.lat = str(zip_codes['latitude'].values[0])
+    observer.lon = str(zip_codes['longitude'].values[0])
+    observer.pressure = 0  # Disable atmospheric refraction for more accurate sunrise/sunset
+    sun = ephem.Sun()
+    
+    start_date = datetime.date(2022, 1, 1)  # Start of the year
+    end_date = datetime.date(2024, 1, 1)  # End of the year
+    dates = []
+    day_lengths = []
+    
+    current_date = start_date
+    while current_date <= end_date:
+        observer.date = current_date
+        try:
+            sunrise = observer.next_rising(sun, use_center=True)  # Use center of the sun for accuracy
+            sunset = observer.next_setting(sun, use_center=True)
+    
+            # Convert sunrise and sunset to local timezone
+            sunrise = ephem.localtime(sunrise)#.replace(tzinfo=timezone)
+            sunset = ephem.localtime(sunset)#.replace(tzinfo=timezone)
+    
+            # Ensure sunset is after sunrise
+            if sunset < sunrise:
+                sunset += datetime.timedelta(days=1)
+    
+            day_length = sunset - sunrise
+            dates.append(current_date)
+            day_lengths.append(day_length.total_seconds() / 3600)  # Convert to hours
+        except ephem.AlwaysUpError:
+            # Handle polar days
+            dates.append(current_date)
+            day_lengths.append(24)
+        except ephem.NeverUpError:
+            # Handle polar nights
+            dates.append(current_date)
+            day_lengths.append(0)
+        current_date += datetime.timedelta(days=1)
+
+    day_lengths = np.array(day_lengths)
+    
+    return day_lengths
+
+def generate_ranges(suit):
+    suit = suit.rolling(time=30, center=True).mean()
+    # bef = suit
+    # aft = xr.where(suit < 0.01, 0, suit)
+    # suit = xr.where(suit > 0, suit, 0).where(suit < 1, suit, 0)
+    # a = xr.plot.hist(suit.isel(lat=lat,lon=lon))
+    
+    from scipy.signal import find_peaks, peak_widths
+    import pandas as pd
+    x = suit.isel(lat=lat,lon=lon)
+    peaks, _ = find_peaks(x, width=view_window/2)  # Adjust as needed
+    # print(peaks)
+    peak_times = x.time[peaks].values
+    suitability_values = x.values.flatten()
+    # suitability_values = suitability_values[~np.isnan(suitability_values)]
+    plt.plot(peak_times, suitability_values[peaks], "x", color="red", label="Peaks")
+    
+    widths, width_heights, left_ips, right_ips = peak_widths(
+        suitability_values, peaks, rel_height=0.9
+    )  #
+    
+    # Since xarray works with datetime, the peak widths must be converted to the same
+    left_edges = [peak_times[i] - pd.to_timedelta(abs(x - left_ips[i]), unit='D') for i, x in enumerate(peaks)]
+    right_edges = [peak_times[i] + pd.to_timedelta(abs(x - right_ips[i]), unit='D') for i, x in enumerate(peaks)]
+    # Plot peak widths as horizontal lines
+    plant_ranges = []
+    for left, right, height, widths in zip(left_edges, right_edges, width_heights, widths):
+        if height < 0.03:
+            pass
+        else:
+            right_adjusted = right + pd.to_timedelta(-view_window, unit="D")
+            if left >= right_adjusted:
+                pass
+            else:
+                plant_ranges.append([left, right_adjusted])
+            plt.hlines(height, left, right, color="green", linestyle="--")
+
+    return plant_ranges
+
+def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
+    zip_codes = crop_sim.load_zip(zipcode)
+    loca_tasmin, loca_tasmax = load_temperature_data(zip_codes)
+    ecocrop_df = load_ecocrop()
+    tmin, tmax, topt_min, topt_max, gmin, gmax = load_crop_variables(ecocrop_df, crop_name)
+    zip_codes = add_loca_index(zip_codes, loca_tasmin, loca_tasmax)
+    lat, lon = zip_codes['loca_index'].values[0]
+    loca_tasmin_smoothed, loca_tasmax_smoothed = crop_sim.smooth_tas(loca_tasmin, loca_tasmax)
+    day_lengths = generate_day_lengths(zip_codes)
+    daily_suitability = suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance)
+    # cutoff = 0.1
+    growing_season_suitability = crop_sim.calculate_season_suitability(gmin, gmax, daily_suitability, day_lengths, min_day, max_day)
+    # optimal_planting_ranges = crop_sim.calculate_optimal_planting_ranges(growing_season_suitability, lat, lon, cutoff)
+    ranges = {}
+    for window_size, suitability in growing_season_suitability.items():
+        if window_size == next(iter(growing_season_suitability)):
+            plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, view_window, optimal_planting_ranges, lat, lon, crop_name, day_lengths, dates)
+
+        suit = growing_season_suitability[view_window]
+        ranges[window_size] = merge_overlapping_monthday_ranges(generate_ranges(suit))
+
+
+
+    
