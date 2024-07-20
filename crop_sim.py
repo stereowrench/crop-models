@@ -215,8 +215,8 @@ def smooth_tas(loca_tasmin, loca_tasmax):
     # loca_tasmin_smoothed = loca_tasmin.where(np.abs(tasmin_zscores) < z_threshold)
     # loca_tasmax_smoothed = loca_tasmax.where(np.abs(tasmax_zscores) < z_threshold)
 
-    loca_tasmin_smoothed =  loca_tasmin.rolling(time=7, center=True).mean()
-    loca_tasmax_smoothed =  loca_tasmax.rolling(time=7, center=True).mean()
+    loca_tasmin_smoothed =  loca_tasmin.rolling(time=7, center=True).mean().interpolate_na(dim="time")
+    loca_tasmax_smoothed =  loca_tasmax.rolling(time=7, center=True).mean().interpolate_na(dim="time")
     
     return (loca_tasmin_smoothed, loca_tasmax_smoothed)
 
@@ -249,7 +249,7 @@ def calculate_season_suitability(gmin, gmax, daily_suitability):
     
     
         # Slice out the original data's suitability after the circular rolling
-        growing_season_suitability[window_size] = season_suitability.where(season_suitability > 0)
+        growing_season_suitability[window_size] = season_suitability.where(season_suitability > 0).fillna(0)
     return growing_season_suitability
     
 def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
