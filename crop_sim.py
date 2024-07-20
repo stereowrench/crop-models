@@ -151,23 +151,23 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
 
     # old_suitability = suitability.copy()
     
-    suitability = xr.where(
-        ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
-        np.where(suitability < 0.2, 0.2, suitability),
-        suitability
-    )
+    # suitability = xr.where(
+    #     ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
   
-    suitability = xr.where(
-        ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
-        np.where(suitability < 0.2, 0.2, suitability),
-        suitability
-    )
+    # suitability = xr.where(
+    #     ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
 
-    suitability = xr.where(
-        (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
-        np.where(suitability < 0.2, 0.2, suitability),
-        suitability
-    )
+    # suitability = xr.where(
+    #     (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
     
     # suitability = xr.where(
     #     ,
@@ -252,7 +252,7 @@ def calculate_season_suitability(gmin, gmax, daily_suitability):
         growing_season_suitability[window_size] = season_suitability.where(season_suitability > 0).fillna(0)
     return growing_season_suitability
     
-def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
+def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon, cutoff):
     
     def chunk_contiguous_dates(dates):
         """Chunks a pandas Series of dates into contiguous sections.
@@ -278,7 +278,8 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
     optimal_planting_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
         suitability = suitability.isel(lat=lat,lon=lon)
-        cutoff = suitability.quantile(0.2)
+        # cutoff = xr.where(suitability > 0, suitability, 0).where(suitability < 1, suitability, 0).quantile(0.2)
+        # print(f"cutoff {cutoff}")
         daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=30, center=True).mean()
         suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > cutoff).interpolate_na(dim="time",limit=7).dropna(dim="time")
 
@@ -302,7 +303,7 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon):
             else:
                 # print([days, window_size, ds, de])
                 if days >= window_size:
-                    print(days - window_size)
+                    # print(days - window_size)
                     if days - window_size < 14:
                         pass
                     else:
@@ -366,10 +367,13 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     # Show the plot
     plt.show()
 
-def plot_suitability(view_window, growing_season_suitability, daily_suitability, lat, lon, crop_name):
+def plot_suitability(view_window, growing_season_suitability, daily_suitability, lat, lon, crop_name, cutoff):
     window_size = view_window
     daily_suitability_smoothed = growing_season_suitability[window_size].interpolate_na(dim="time", limit=3).rolling(time=30, center=True).mean()
-    cutoff = daily_suitability_smoothed.isel(lat=lat,lon=lon).quantile(0.2)
+    dssi = daily_suitability_smoothed.isel(lat=lat,lon=lon)
+    # cutoff = xr.where(dssi > 0, dssi, 0).where(dssi < 1, dssi, 0).quantile(0.2)
+    # cutoff = 0.2
+    # print(f"cutoff {cutoff}")
     daily_suitability_smoothed = daily_suitability_smoothed.where(daily_suitability_smoothed > cutoff)
     
     
