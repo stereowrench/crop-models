@@ -220,7 +220,7 @@ def smooth_tas(loca_tasmin, loca_tasmax):
     
     return (loca_tasmin_smoothed, loca_tasmax_smoothed)
 
-def suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance):
+def calc_suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance):
     # Calculate daily suitability for the entire LOCA dataset using apply_ufunc
     # frost_tolerance = 0
     if bolting:
@@ -550,9 +550,9 @@ def generate_day_lengths(zip_codes):
 
     day_lengths = np.array(day_lengths)
     
-    return day_lengths
+    return day_lengths, dates
 
-def generate_ranges(suit):
+def generate_ranges(suit, lat, lon, view_window):
     suit = suit.rolling(time=30, center=True).mean()
     # bef = suit
     # aft = xr.where(suit < 0.01, 0, suit)
@@ -567,7 +567,7 @@ def generate_ranges(suit):
     peak_times = x.time[peaks].values
     suitability_values = x.values.flatten()
     # suitability_values = suitability_values[~np.isnan(suitability_values)]
-    plt.plot(peak_times, suitability_values[peaks], "x", color="red", label="Peaks")
+    # plt.plot(peak_times, suitability_values[peaks], "x", color="red", label="Peaks")
     
     widths, width_heights, left_ips, right_ips = peak_widths(
         suitability_values, peaks, rel_height=0.9
@@ -583,34 +583,45 @@ def generate_ranges(suit):
             pass
         else:
             right_adjusted = right + pd.to_timedelta(-view_window, unit="D")
-            if left >= right_adjusted:
+            if left.date() >= right_adjusted.date():
                 pass
             else:
                 plant_ranges.append([left, right_adjusted])
-            plt.hlines(height, left, right, color="green", linestyle="--")
+            # plt.hlines(height, left, right, color="green", linestyle="--")
 
     return plant_ranges
 
 def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
-    zip_codes = crop_sim.load_zip(zipcode)
+    frost_tolerance = 0
+    zip_codes = load_zip(zipcode)
     loca_tasmin, loca_tasmax = load_temperature_data(zip_codes)
     ecocrop_df = load_ecocrop()
     tmin, tmax, topt_min, topt_max, gmin, gmax = load_crop_variables(ecocrop_df, crop_name)
     zip_codes = add_loca_index(zip_codes, loca_tasmin, loca_tasmax)
     lat, lon = zip_codes['loca_index'].values[0]
-    loca_tasmin_smoothed, loca_tasmax_smoothed = crop_sim.smooth_tas(loca_tasmin, loca_tasmax)
-    day_lengths = generate_day_lengths(zip_codes)
-    daily_suitability = suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance)
+    loca_tasmin_smoothed, loca_tasmax_smoothed = smooth_tas(loca_tasmin, loca_tasmax)
+    day_lengths, dates = generate_day_lengths(zip_codes)
+    daily_suitability = calc_suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance)
     # cutoff = 0.1
-    growing_season_suitability = crop_sim.calculate_season_suitability(gmin, gmax, daily_suitability, day_lengths, min_day, max_day)
+    growing_season_suitability = calculate_season_suitability(gmin, gmax, daily_suitability, day_lengths, min_day, max_day)
     # optimal_planting_ranges = crop_sim.calculate_optimal_planting_ranges(growing_season_suitability, lat, lon, cutoff)
     ranges = {}
+    acc_ranges = {}
+    for window_size, suitability in growing_season_suitability.items():
+        suit = growing_season_suitability[window_size]
+        loc_ranges = generate_ranges(suit, lat, lon, window_size)
+        acc_ranges[window_size] = loc_ranges
+
+        if len(loc_ranges) > 0:
+            ranges[window_size] = merge_overlapping_monthday_ranges(loc_ranges)
+        else:
+            ranges[window_size] = []
+    
     for window_size, suitability in growing_season_suitability.items():
         if window_size == next(iter(growing_season_suitability)):
-            plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, view_window, optimal_planting_ranges, lat, lon, crop_name, day_lengths, dates)
+            plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, window_size, acc_ranges, lat, lon, crop_name, day_lengths, dates)
 
-        suit = growing_season_suitability[view_window]
-        ranges[window_size] = merge_overlapping_monthday_ranges(generate_ranges(suit))
+    return ranges
 
 
 
