@@ -151,17 +151,17 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
 
     # old_suitability = suitability.copy()
     
-    # suitability = xr.where(
-    #     ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
-    #     np.where(suitability < 0.2, 0.2, suitability),
-    #     suitability
-    # )
+    suitability = xr.where(
+        ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
+        np.where(suitability < 0.2, 0.2, suitability),
+        suitability
+    )
   
-    # suitability = xr.where(
-    #     ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
-    #     np.where(suitability < 0.2, 0.2, suitability),
-    #     suitability
-    # )
+    suitability = xr.where(
+        ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
+        np.where(suitability < 0.2, 0.2, suitability),
+        suitability
+    )
 
     suitability = xr.where(
         (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
@@ -235,7 +235,7 @@ def suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax,
     )
     return daily_suitability
 
-def calculate_season_suitability(gmin, gmax, daily_suitability):
+def calculate_season_suitability(gmin, gmax, daily_suitability, day_lengths, min_day, max_day):
     growing_season_suitability = {}
     for window_size in range(int(gmin), int(gmax) + 1, 10):
         # Extend the data for circular rolling
@@ -246,7 +246,7 @@ def calculate_season_suitability(gmin, gmax, daily_suitability):
         # alpha=0.3
         # span=10
         # season_suitability = daily_suitability.rolling_exp(time=span, window_type="span").mean()
-    
+        season_suitability = xr.where((day_lengths > min_day) & (day_lengths < max_day), season_suitability, 0)
     
         # Slice out the original data's suitability after the circular rolling
         growing_season_suitability[window_size] = season_suitability.where(season_suitability > 0).fillna(0)
