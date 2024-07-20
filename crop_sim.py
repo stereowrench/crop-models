@@ -338,7 +338,7 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     ax1.axhline(y = ftopt_max, color = 'y', linestyle = '-')
 
     ax2 = ax1.twinx()
-    ax2.plot(dates, day_lengths)
+    ax2.plot(dates, day_lengths, color="pink")
     
     ax = plt.gca()
     
@@ -349,6 +349,7 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     
     # Create legend elements
     blue_line = mlines.Line2D([0], [0], color='blue', lw=2, label='Lower Temperature Threshold')
+    day_line = mlines.Line2D([0], [0], color='pink', lw=2, label='Day length')
     green_line = mlines.Line2D([0], [0], color='green', lw=2, label='Upper Temperature Threshold')
     red_line = mlines.Line2D([0], [0], color='red', lw=2, linestyle='-', label='Absolute Temperature Limit')
     yellow_line = mlines.Line2D([0], [0], color='yellow', lw=2, linestyle='-', label='Optimal Temperature Range')
@@ -356,7 +357,7 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     yellow_patch = mpatches.Patch(color='yellow', alpha=0.5, label=f'Growing Season Length: {view_window}')
     
     # Add legend
-    plt.legend(handles=[blue_line, green_line, red_line, yellow_line, blue_patch, yellow_patch], loc='upper left', bbox_to_anchor=(1.04, 1))
+    plt.legend(handles=[blue_line, day_line, green_line, red_line, yellow_line, blue_patch, yellow_patch], loc='upper left', bbox_to_anchor=(1.04, 1))
     
     # Add labels and title
     plt.title(f'Minimum Daily Temperature Over Time ({crop_name})')
@@ -552,12 +553,11 @@ def generate_day_lengths(zip_codes):
     
     return day_lengths, dates
 
-def generate_ranges(suit, lat, lon, view_window):
+def generate_ranges(suit, lat, lon, view_window, show, crop_name):
     suit = suit.rolling(time=30, center=True).mean()
     # bef = suit
     # aft = xr.where(suit < 0.01, 0, suit)
     # suit = xr.where(suit > 0, suit, 0).where(suit < 1, suit, 0)
-    # a = xr.plot.hist(suit.isel(lat=lat,lon=lon))
     
     from scipy.signal import find_peaks, peak_widths
     import pandas as pd
@@ -567,7 +567,11 @@ def generate_ranges(suit, lat, lon, view_window):
     peak_times = x.time[peaks].values
     suitability_values = x.values.flatten()
     # suitability_values = suitability_values[~np.isnan(suitability_values)]
-    # plt.plot(peak_times, suitability_values[peaks], "x", color="red", label="Peaks")
+    if show:
+        plt.figure(figsize=(12, 6))
+        plt.title(f"Suitability for {crop_name}")
+        plt.plot(x.time, x.values)
+        plt.plot(peak_times, suitability_values[peaks], "x", color="red", label="Peaks")
     
     widths, width_heights, left_ips, right_ips = peak_widths(
         suitability_values, peaks, rel_height=0.9
@@ -587,8 +591,10 @@ def generate_ranges(suit, lat, lon, view_window):
                 pass
             else:
                 plant_ranges.append([left, right_adjusted])
-            # plt.hlines(height, left, right, color="green", linestyle="--")
-
+            if show:
+                plt.hlines(height, left, right, color="green", linestyle="--")
+    if show:
+        plt.show()
     return plant_ranges
 
 def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
@@ -608,8 +614,11 @@ def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
     ranges = {}
     acc_ranges = {}
     for window_size, suitability in growing_season_suitability.items():
+        show = False
+        if window_size == next(iter(growing_season_suitability)):
+            show = True
         suit = growing_season_suitability[window_size]
-        loc_ranges = generate_ranges(suit, lat, lon, window_size)
+        loc_ranges = generate_ranges(suit, lat, lon, window_size, show, crop_name)
         acc_ranges[window_size] = loc_ranges
 
         if len(loc_ranges) > 0:
