@@ -43,6 +43,7 @@ def add_loca_index(zip_codes, loca_tasmin, loca_tasmax):
         distances = np.sqrt((loca_tasmin['lat'] - lat)**2 + (loca_tasmin['lon'] - lon)**2)
     
         return np.unravel_index(distances.argmin(), distances.shape)  # Returns the index of the closest grid point
+
     zip_codes['loca_index'] = zip_codes.apply(
         lambda row: find_nearest_grid_point(row['latitude'], row['longitude']),
         axis=1
@@ -102,28 +103,28 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
     topt_min = topt_min + 273.15
     topt_max = topt_max + 273.15
     frost_temperature = 273.15
-    max_consecutive_frost_days = 3
-    max_consecutive_nippy_days = 3
-    max_consecutive_heat_days = 3
+    # max_consecutive_frost_days = 3
+    # max_consecutive_nippy_days = 3
+    # max_consecutive_heat_days = 3
     
     # Basic suitability based on absolute thresholds
     suitability = ((tasmin > (tmin - frost_tolerance)) & (tasmax < tmax)).astype(float)  
     frost_tolerant_range = (tasmin >= (tmin - frost_tolerance)) & (tasmin < tmin)
 
-    # Identify frost days (where tasmin is below the adjusted tmin)
-    nippy_days = ((tasmin < tmin) & (tasmin > 273.15)).astype(int)
-    nippy_days = pd.Series(nippy_days)
+    # # Identify frost days (where tasmin is below the adjusted tmin)
+    # nippy_days = ((tasmin < tmin) & (tasmin > 273.15)).astype(int)
+    # nippy_days = pd.Series(nippy_days)
     
-    frost_days = (tasmin < frost_temperature).astype(int)
-    frost_days = pd.Series(frost_days)
+    # frost_days = (tasmin < frost_temperature).astype(int)
+    # frost_days = pd.Series(frost_days)
 
-    heat_days = (tasmax > tmax).astype(int)
-    heat_days = pd.Series(heat_days)
+    # heat_days = (tasmax > tmax).astype(int)
+    # heat_days = pd.Series(heat_days)
     
-    # Calculate consecutive frost days using pandas rolling and sum
-    consecutive_frost_days = frost_days.rolling(window=7, min_periods=1).sum().to_numpy()
-    consecutive_nippy_days = nippy_days.rolling(window=7, min_periods=1).sum().to_numpy()
-    consecutive_heat_days = heat_days.rolling(window=7, min_periods=1).sum().to_numpy()
+    # # Calculate consecutive frost days using pandas rolling and sum
+    # consecutive_frost_days = frost_days.rolling(window=7, min_periods=1).sum().to_numpy()
+    # consecutive_nippy_days = nippy_days.rolling(window=7, min_periods=1).sum().to_numpy()
+    # consecutive_heat_days = heat_days.rolling(window=7, min_periods=1).sum().to_numpy()
     
     # plot_nippy(consecutive_nippy_days)
 
@@ -151,23 +152,23 @@ def calculate_suitability(tasmin, tasmax, tmin, tmax, topt_min, topt_max, frost_
 
     # old_suitability = suitability.copy()
     
-    suitability = xr.where(
-        ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
-        np.where(suitability < 0.2, 0.2, suitability),
-        suitability
-    )
+    # suitability = xr.where(
+    #     ((consecutive_nippy_days <= max_consecutive_nippy_days) & (consecutive_nippy_days > 0)),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
   
-    suitability = xr.where(
-        ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
-        np.where(suitability < 0.2, 0.2, suitability),
-        suitability
-    )
+    # suitability = xr.where(
+    #     ((consecutive_frost_days <= max_consecutive_frost_days) & (consecutive_frost_days > 0)),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
 
-    suitability = xr.where(
-        (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
-        np.where(suitability < 0.2, 0.2, suitability),
-        suitability
-    )
+    # suitability = xr.where(
+    #     (consecutive_heat_days > 0)& (consecutive_heat_days <= max_consecutive_heat_days),
+    #     np.where(suitability < 0.2, 0.2, suitability),
+    #     suitability
+    # )
     
     # suitability = xr.where(
     #     ,
@@ -242,7 +243,8 @@ def calculate_season_suitability(gmin, gmax, daily_suitability, day_lengths, min
         # season_suitability = daily_suitability.rolling(time=window_size, min_periods=window_size, center=False).mean()
         # season_suitability = daily_suitability[::-1].rolling(time=window_size, min_periods=window_size, center=True).mean()[::-1]
         # season_suitability = daily_suitability.rolling(time=7, min_periods=7).mean().fillna(0)
-        season_suitability = daily_suitability.rolling(time=7, min_periods=7).mean().interpolate_na(dim="time")
+        # season_suitability = daily_suitability.rolling(time=7, min_periods=7).mean().interpolate_na(dim="time")
+        season_suitability = daily_suitability.interpolate_na(dim="time")
         # alpha=0.3
         # span=10
         # season_suitability = daily_suitability.rolling_exp(time=span, window_type="span").mean()
@@ -280,7 +282,8 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon, cuto
         suitability = suitability.isel(lat=lat,lon=lon)
         # cutoff = xr.where(suitability > 0, suitability, 0).where(suitability < 1, suitability, 0).quantile(0.2)
         # print(f"cutoff {cutoff}")
-        daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=30, center=True).mean()
+        # daily_suitability_smoothed = suitability.interpolate_na(dim="time", limit=7).rolling(time=30, center=True).mean()
+        daily_suitability_smoothed = suitability
         suitable_dates = daily_suitability_smoothed.where(daily_suitability_smoothed > cutoff).interpolate_na(dim="time",limit=7).dropna(dim="time")
 
         ranges = []
@@ -313,7 +316,7 @@ def calculate_optimal_planting_ranges(growing_season_suitability, lat, lon, cuto
     
     return optimal_planting_ranges
 
-def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, view_window, optimal_planting_ranges, lat, lon, crop_name, day_lengths, dates):
+def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, view_window, optimal_planting_ranges, lat, lon, crop_name, day_lengths, dates, zip_code):
     ltime_values = loca_tasmin_smoothed.isel(lat=lat,lon=lon).time.values
     ltemp_values = loca_tasmin_smoothed.isel(lat=lat,lon=lon).values
     ltemp_values = convert_temperature(ltemp_values, "K", "F")
@@ -360,7 +363,7 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     plt.legend(handles=[blue_line, day_line, green_line, red_line, yellow_line, blue_patch, yellow_patch], loc='upper left', bbox_to_anchor=(1.04, 1))
     
     # Add labels and title
-    plt.title(f'Minimum Daily Temperature Over Time ({crop_name})')
+    plt.title(f'Minimum Daily Temperature Over Time ({crop_name}) @ {zip_code}')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Temperature (°F)')
     # plt.grid(axis='y', linestyle='--')
@@ -553,8 +556,39 @@ def generate_day_lengths(zip_codes):
     
     return day_lengths, dates
 
-def generate_ranges(suit, lat, lon, view_window, show, crop_name):
-    suit = suit.rolling(time=30, center=True).mean()
+def generate_ranges(suit, lat, lon, view_window, show, crop_name, zip_code):
+    from scipy.signal import savgol_filter, butter, lfilter
+    suit = suit.rolling(time=14, center=True).mean()
+    num_iterations = 4  # Adjust as needed
+    for _ in range(num_iterations):
+        suit = xr.apply_ufunc(
+            savgol_filter,
+            suit,
+            kwargs={'window_length': 30, 'polyorder': 2, 'axis': 0},  
+            dask='parallelized' 
+        )
+    
+    # Define filter parameters
+    # order = 4             # Filter order (higher order = sharper cutoff)
+    # cutoff_freq = 0.05    # Cutoff frequency (adjust to control smoothing strength)
+    # nyquist_freq = 0.5    # Nyquist frequency (half the sampling rate)
+    
+    # # Normalize cutoff frequency
+    # Wn = cutoff_freq / nyquist_freq 
+    
+    # # Design the Butterworth filter (we'll use a lowpass filter for smoothing)
+    # b,a  = butter(order, Wn, btype='lowpass', output='sos')  
+    
+    # # Apply the filter to the suitability data
+    # suit = xr.apply_ufunc(
+    #     lfilter, 
+    #     b,a,suit,
+    #     kwargs={'axis': 0},   # Filter along the 'time' axis
+    #     input_core_dims=[[], [], ['time']],  # Core dimension for suitability, none for sos
+    #     output_core_dims=[['time']], 
+    #     dask='parallelized' 
+    # )
+    # suit = suit.rolling(time=7, center=True).mean()
     # bef = suit
     # aft = xr.where(suit < 0.01, 0, suit)
     # suit = xr.where(suit > 0, suit, 0).where(suit < 1, suit, 0)
@@ -569,7 +603,7 @@ def generate_ranges(suit, lat, lon, view_window, show, crop_name):
     # suitability_values = suitability_values[~np.isnan(suitability_values)]
     if show:
         plt.figure(figsize=(12, 6))
-        plt.title(f"Suitability for {crop_name}")
+        plt.title(f"Suitability for {crop_name} @ {zip_code}")
         plt.plot(x.time, x.values)
         plt.plot(peak_times, suitability_values[peaks], "x", color="red", label="Peaks")
     
@@ -597,6 +631,9 @@ def generate_ranges(suit, lat, lon, view_window, show, crop_name):
         plt.show()
     return plant_ranges
 
+# def get_day_length_from_lat(lat):
+    
+
 def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
     frost_tolerance = 0
     zip_codes = load_zip(zipcode)
@@ -609,6 +646,7 @@ def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
     day_lengths, dates = generate_day_lengths(zip_codes)
     daily_suitability = calc_suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance)
     # cutoff = 0.1
+    # min_day, max_day = get_day_length_from_lat(zip_codes['latitude'])
     growing_season_suitability = calculate_season_suitability(gmin, gmax, daily_suitability, day_lengths, min_day, max_day)
     # optimal_planting_ranges = crop_sim.calculate_optimal_planting_ranges(growing_season_suitability, lat, lon, cutoff)
     ranges = {}
@@ -618,7 +656,7 @@ def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
         if window_size == next(iter(growing_season_suitability)):
             show = True
         suit = growing_season_suitability[window_size]
-        loc_ranges = generate_ranges(suit, lat, lon, window_size, show, crop_name)
+        loc_ranges = generate_ranges(suit, lat, lon, window_size, show, crop_name, zipcode)
         acc_ranges[window_size] = loc_ranges
 
         if len(loc_ranges) > 0:
@@ -628,7 +666,7 @@ def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
     
     for window_size, suitability in growing_season_suitability.items():
         if window_size == next(iter(growing_season_suitability)):
-            plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, window_size, acc_ranges, lat, lon, crop_name, day_lengths, dates)
+            plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, window_size, acc_ranges, lat, lon, crop_name, day_lengths, dates, zipcode)
 
     return ranges
 
