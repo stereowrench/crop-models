@@ -115,7 +115,7 @@ numpy==1.24.4
 ortools==9.10.4067
 overrides==7.7.0
 packaging==24.1
-pandas==2.2.2
+pandas==2.2
 pandocfilters==1.5.1
 parsel==1.9.1
 parso==0.8.4
@@ -142,7 +142,6 @@ pydantic==2.7.4
 pydantic-xml==2.11.0
 pydantic_core==2.18.4
 PyDispatcher==2.0.7
-pyee==11.1.0
 pyephem==9.99
 Pygments==2.18.0
 PyMuPDF==1.24.6
@@ -151,7 +150,6 @@ pyOpenSSL==24.1.0
 pyparsing==3.1.2
 PyPDF2==2.5.0
 pypng==0.20220715.0
-pyppeteer==1.0.2
 pyproj==3.6.1
 pyshp==2.3.1
 python-dateutil==2.9.0.post0
@@ -215,7 +213,7 @@ webencodings==0.5.1
 websocket-client==1.8.0
 websockets==10.4
 widgetsnbextension==4.0.11
-xarray==2024.6.0
+xarray==0.20.1
 zc.lockfile==3.0.post1
 zipp==3.19.2
 zope.interface==6.4.post2
