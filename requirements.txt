@@ -112,10 +112,9 @@ notebook_shim==0.2.4
 numba==0.60.0
 numbagg==0.8.1
 numpy==1.24.4
-ortools==9.10.4067
 overrides==7.7.0
 packaging==24.1
-pandas==2.2
+pandas==1.5
 pandocfilters==1.5.1
 parsel==1.9.1
 parso==0.8.4
