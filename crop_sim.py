@@ -216,8 +216,29 @@ def smooth_tas(loca_tasmin, loca_tasmax):
     # loca_tasmin_smoothed = loca_tasmin.where(np.abs(tasmin_zscores) < z_threshold)
     # loca_tasmax_smoothed = loca_tasmax.where(np.abs(tasmax_zscores) < z_threshold)
 
-    loca_tasmin_smoothed =  loca_tasmin.rolling(time=7, center=True).mean().interpolate_na(dim="time")
-    loca_tasmax_smoothed =  loca_tasmax.rolling(time=7, center=True).mean().interpolate_na(dim="time")
+    from scipy.signal import savgol_filter, butter, lfilter
+    # suit = suit.rolling(time=14, center=True).mean()
+
+    #     suit = xr.apply_ufunc(
+    #         savgol_filter,
+    #         suit,
+    #         kwargs={'window_length': 30, 'polyorder': 2, 'axis': 0},  
+    #         dask='parallelized' 
+    #     )
+    
+    loca_tasmin_smoothed =  loca_tasmin.rolling(time=30, center=True).mean().interpolate_na(dim="time")
+    loca_tasmax_smoothed =  loca_tasmax.rolling(time=30, center=True).mean().interpolate_na(dim="time")
+
+    num_iterations = 1  # Adjust as needed
+    for _ in range(num_iterations):
+        loca_tasmin_smoothed = xr.apply_ufunc(savgol_filter, loca_tasmin_smoothed,
+            kwargs={'window_length': 30, 'polyorder': 2, 'axis': 0},  
+            dask='parallelized' 
+        )
+        loca_tasmax_smoothed = xr.apply_ufunc(savgol_filter, loca_tasmax_smoothed,
+            kwargs={'window_length': 30, 'polyorder': 2, 'axis': 0},  
+            dask='parallelized' 
+        )
     
     return (loca_tasmin_smoothed, loca_tasmax_smoothed)
 
@@ -624,7 +645,12 @@ def generate_ranges(suit, lat, lon, view_window, show, crop_name, zip_code):
             if left.date() >= right_adjusted.date():
                 pass
             else:
-                plant_ranges.append([left, right_adjusted])
+                if right - left >= pd.to_timedelta(365, unit="D"):
+                    plant_ranges.append([pd.to_datetime("2023-01-01"), pd.to_datetime("2023-12-31")])
+                    plt.hlines(height, left, right, color="green", linestyle="--")
+                    break
+                else:
+                    plant_ranges.append([left, right_adjusted])
             if show:
                 plt.hlines(height, left, right, color="green", linestyle="--")
     if show:
