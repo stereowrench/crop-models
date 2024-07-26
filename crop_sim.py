@@ -544,24 +544,26 @@ def generate_day_lengths(zip_codes):
     end_date = datetime.date(2024, 1, 1)  # End of the year
     dates = []
     day_lengths = []
+
     
     current_date = start_date
     while current_date <= end_date:
         observer.date = current_date
         try:
-            sunrise = observer.next_rising(sun, use_center=True)  # Use center of the sun for accuracy
-            sunset = observer.next_setting(sun, use_center=True)
+            sunrise = observer.next_rising(sun, use_center=True).datetime() # Use center of the sun for accuracy
+            sunset = observer.next_setting(sun, use_center=True).datetime()
     
             # Convert sunrise and sunset to local timezone
-            sunrise = ephem.localtime(sunrise)#.replace(tzinfo=timezone)
-            sunset = ephem.localtime(sunset)#.replace(tzinfo=timezone)
-    
+            # sunrise = ephem.localtime(sunrise)#.replace(tzinfo=timezone)
+            # sunset = ephem.localtime(sunset)#.replace(tzinfo=timezone)
+            
             # Ensure sunset is after sunrise
             if sunset < sunrise:
                 sunset += datetime.timedelta(days=1)
     
             day_length = sunset - sunrise
             dates.append(current_date)
+                
             day_lengths.append(day_length.total_seconds() / 3600)  # Convert to hours
         except ephem.AlwaysUpError:
             # Handle polar days
