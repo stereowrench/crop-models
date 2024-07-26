@@ -668,7 +668,32 @@ def all_in_one(zipcode, crop_name, bolting, min_day, max_day):
     tmin, tmax, topt_min, topt_max, gmin, gmax = load_crop_variables(ecocrop_df, crop_name)
     zip_codes = add_loca_index(zip_codes, loca_tasmin, loca_tasmax)
     lat, lon = zip_codes['loca_index'].values[0]
-    loca_tasmin_smoothed, loca_tasmax_smoothed = smooth_tas(loca_tasmin, loca_tasmax)
+    min_days = loca_tasmin.groupby("time.dayofyear").mean("time")
+    max_days = loca_tasmax.groupby("time.dayofyear").mean("time")
+
+    start_year = 2022
+    end_year = 2024
+    time_index = pd.date_range(start=f"{start_year}-01-01", end=f"{end_year}-1-1", freq="D")
+    two_year_tasmin = xr.DataArray(
+        coords={"time": time_index, "lat": min_days.lat, "lon": min_days.lon},
+        dims=["time", "lat", "lon"],
+    )
+    
+    two_year_tasmax = xr.DataArray(
+        coords={"time": time_index, "lat": max_days.lat, "lon": max_days.lon},
+        dims=["time", "lat", "lon"],
+    )
+    
+    # Fill values from min_days for each day of year 
+    for t in two_year_tasmin.time:
+        day_of_year = t.dt.dayofyear
+        # month = t.dt.month
+        two_year_tasmin.loc[t, :, :] = min_days.sel(dayofyear=day_of_year)
+        two_year_tasmax.loc[t, :, :] = max_days.sel(dayofyear=day_of_year)
+
+
+    
+    loca_tasmin_smoothed, loca_tasmax_smoothed = smooth_tas(two_year_tasmin, two_year_tasmax)
     day_lengths, dates = generate_day_lengths(zip_codes)
     daily_suitability = calc_suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_min, topt_max, frost_tolerance)
     # cutoff = 0.1
