@@ -588,7 +588,7 @@ def generate_ranges(suit, lat, lon, view_window, show, crop_name, zip_code):
             kwargs={'window_length': 30, 'polyorder': 2, 'axis': 0},  
             dask='parallelized' 
         )
-    
+    suit = suit.clip(0,1)
     # Define filter parameters
     # order = 4             # Filter order (higher order = sharper cutoff)
     # cutoff_freq = 0.05    # Cutoff frequency (adjust to control smoothing strength)
