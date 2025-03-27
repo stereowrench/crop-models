@@ -257,9 +257,16 @@ def calc_suitability(bolting, loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, 
     )
     return daily_suitability
 
+def min_limit(m):
+    x = m - 40
+    if x < 0:
+        return 0
+    else:
+        return x
+
 def calculate_season_suitability(gmin, gmax, daily_suitability, day_lengths, min_day, max_day):
     growing_season_suitability = {}
-    for window_size in range(int(gmin), int(gmax) + 1, 10):
+    for window_size in range(min_limit(int(gmin)), int(gmax) + 1, 10):
         # Extend the data for circular rolling
         # season_suitability = daily_suitability.rolling(time=window_size, min_periods=window_size, center=False).mean()
         # season_suitability = daily_suitability[::-1].rolling(time=window_size, min_periods=window_size, center=True).mean()[::-1]
@@ -384,7 +391,7 @@ def plot_planting(loca_tasmin_smoothed, loca_tasmax_smoothed, tmin, tmax, topt_m
     plt.legend(handles=[blue_line, day_line, green_line, red_line, yellow_line, blue_patch, yellow_patch], loc='upper left', bbox_to_anchor=(1.04, 1))
     
     # Add labels and title
-    plt.title(f'Minimum Daily Temperature Over Time ({crop_name}) @ {zip_code}')
+    plt.title(f'Plant Scheduling ({crop_name}) @ {zip_code}')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Temperature (°F)')
     # plt.grid(axis='y', linestyle='--')
